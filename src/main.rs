@@ -82,12 +82,21 @@ fn run_git(args: &str, cwd: Option<&str>) -> Option<String> {
     if s.is_empty() { None } else { Some(s) }
 }
 
+fn format_context_percentage(pct: f64) -> String {
+    let text = format!("{:.0}%", pct);
+    if pct > 75.0 {
+        format!("\x1b[31m{}\x1b[0m", text)
+    } else {
+        text
+    }
+}
+
 fn context_percentage(data: &StatusJSON) -> Option<String> {
     let cw = data.context_window.as_ref()?;
 
     if let Some(pct) = cw.used_percentage {
         if pct.is_finite() && pct >= 0.0 {
-            return Some(format!("{:.1}%", pct.min(100.0)));
+            return Some(format_context_percentage(pct.min(100.0)));
         }
     }
 
@@ -106,11 +115,15 @@ fn context_percentage(data: &StatusJSON) -> Option<String> {
     };
 
     let pct = (used / window_size * 100.0).min(100.0);
-    Some(format!("{:.1}%", pct))
+    Some(format_context_percentage(pct))
 }
 
 fn is_inside_git_work_tree(cwd: Option<&str>) -> bool {
     run_git("rev-parse --is-inside-work-tree", cwd).as_deref() == Some("true")
+}
+
+fn color(code: &str, text: &str) -> String {
+    format!("\x1b[{}m{}\x1b[0m", code, text)
 }
 
 fn git_root_dir(cwd: Option<&str>) -> String {
@@ -131,7 +144,8 @@ fn git_branch(cwd: Option<&str>) -> String {
     if !is_inside_git_work_tree(cwd) {
         return "no git".to_string();
     }
-    run_git("branch --show-current", cwd).unwrap_or_else(|| "no git".to_string())
+    let branch = run_git("branch --show-current", cwd).unwrap_or_else(|| "no git".to_string());
+    color("35", &branch)
 }
 
 fn git_status(cwd: Option<&str>) -> String {
@@ -173,10 +187,10 @@ fn git_status(cwd: Option<&str>) -> String {
     }
 
     let mut flags = String::new();
-    if modified { flags.push('M'); }
-    if staged { flags.push('S'); }
-    if untracked { flags.push('?'); }
-    if deleted { flags.push('D'); }
+    if modified { flags.push_str(&color("33", "M")); }
+    if staged { flags.push_str(&color("32", "S")); }
+    if untracked { flags.push_str(&color("31", "?")); }
+    if deleted { flags.push_str(&color("33", "D")); }
 
     let ahead_behind = git_ahead_behind(cwd);
     if !ahead_behind.is_empty() {
@@ -212,12 +226,13 @@ fn aws_info() -> String {
         .or_else(|_| env::var("AWS_DEFAULT_REGION"))
         .unwrap_or_default();
 
-    match (profile.is_empty(), region.is_empty()) {
-        (true, true) => String::new(),
+    let text = match (profile.is_empty(), region.is_empty()) {
+        (true, true) => return String::new(),
         (false, true) => profile,
         (true, false) => region,
         (false, false) => format!("{}/{}", profile, region),
-    }
+    };
+    color("33", &text)
 }
 
 fn main() {
