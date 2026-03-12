@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Read;
 use std::process::Command;
 
@@ -75,7 +76,9 @@ fn run_git(args: &str, cwd: Option<&str>) -> Option<String> {
     if !output.status.success() {
         return None;
     }
-    let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let s = String::from_utf8_lossy(&output.stdout)
+        .trim_end()
+        .to_string();
     if s.is_empty() { None } else { Some(s) }
 }
 
@@ -175,10 +178,45 @@ fn git_status(cwd: Option<&str>) -> String {
     if untracked { flags.push('?'); }
     if deleted { flags.push('D'); }
 
-    if flags.is_empty() {
-        String::new()
-    } else {
-        flags
+    let ahead_behind = git_ahead_behind(cwd);
+    if !ahead_behind.is_empty() {
+        flags.push_str(&ahead_behind);
+    }
+
+    flags
+}
+
+fn git_ahead_behind(cwd: Option<&str>) -> String {
+    let output = run_git("rev-list --left-right --count @{upstream}...HEAD", cwd)
+        .unwrap_or_default();
+    let parts: Vec<&str> = output.split_whitespace().collect();
+    if parts.len() != 2 {
+        return String::new();
+    }
+    let behind: i64 = parts[0].parse().unwrap_or(0);
+    let ahead: i64 = parts[1].parse().unwrap_or(0);
+
+    let mut result = String::new();
+    if ahead > 0 {
+        result.push('⇡');
+    }
+    if behind > 0 {
+        result.push('⇣');
+    }
+    result
+}
+
+fn aws_info() -> String {
+    let profile = env::var("AWS_PROFILE").unwrap_or_default();
+    let region = env::var("AWS_REGION")
+        .or_else(|_| env::var("AWS_DEFAULT_REGION"))
+        .unwrap_or_default();
+
+    match (profile.is_empty(), region.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => profile,
+        (true, false) => region,
+        (false, false) => format!("{}/{}", profile, region),
     }
 }
 
@@ -210,11 +248,14 @@ fn main() {
     let branch = git_branch(cwd);
     let changes = git_status(cwd);
 
+    let aws = aws_info();
+
     let parts: Vec<&str> = [
         ctx_pct.as_str(),
         root.as_str(),
         branch.as_str(),
         changes.as_str(),
+        aws.as_str(),
     ]
     .into_iter()
     .filter(|s| !s.is_empty())
