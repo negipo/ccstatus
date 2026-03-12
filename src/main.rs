@@ -131,38 +131,55 @@ fn git_branch(cwd: Option<&str>) -> String {
     run_git("branch --show-current", cwd).unwrap_or_else(|| "no git".to_string())
 }
 
-fn extract_last_number(text: &str) -> i64 {
-    let trimmed = text.trim();
-    let start = trimmed
-        .rfind(|c: char| !c.is_ascii_digit())
-        .map_or(0, |i| i + 1);
-    trimmed[start..].parse().unwrap_or(0)
-}
-
-fn parse_diff_shortstat(stat: &str) -> (i64, i64) {
-    let insertions = stat
-        .find("insertion")
-        .map(|pos| extract_last_number(&stat[..pos]))
-        .unwrap_or(0);
-    let deletions = stat
-        .find("deletion")
-        .map(|pos| extract_last_number(&stat[..pos]))
-        .unwrap_or(0);
-    (insertions, deletions)
-}
-
-fn git_changes(cwd: Option<&str>) -> String {
+fn git_status(cwd: Option<&str>) -> String {
     if !is_inside_git_work_tree(cwd) {
         return "(no git)".to_string();
     }
 
-    let unstaged = run_git("diff --shortstat", cwd).unwrap_or_default();
-    let staged = run_git("diff --cached --shortstat", cwd).unwrap_or_default();
+    let output = run_git("status --porcelain", cwd).unwrap_or_default();
 
-    let (ui, ud) = parse_diff_shortstat(&unstaged);
-    let (si, sd) = parse_diff_shortstat(&staged);
+    let mut modified = false;
+    let mut staged = false;
+    let mut untracked = false;
+    let mut deleted = false;
 
-    format!("(+{},-{})", ui + si, ud + sd)
+    for line in output.lines() {
+        let bytes = line.as_bytes();
+        if bytes.len() < 2 {
+            continue;
+        }
+        let index = bytes[0];
+        let worktree = bytes[1];
+
+        if index == b'?' {
+            untracked = true;
+            continue;
+        }
+        if matches!(index, b'A' | b'M' | b'R' | b'C') {
+            staged = true;
+        }
+        if index == b'D' || worktree == b'D' {
+            deleted = true;
+        }
+        if worktree == b'M' {
+            modified = true;
+        }
+        if matches!(index, b'D') {
+            staged = true;
+        }
+    }
+
+    let mut flags = String::new();
+    if modified { flags.push('M'); }
+    if staged { flags.push('S'); }
+    if untracked { flags.push('?'); }
+    if deleted { flags.push('D'); }
+
+    if flags.is_empty() {
+        String::new()
+    } else {
+        flags
+    }
 }
 
 fn main() {
@@ -191,7 +208,7 @@ fn main() {
     let ctx_pct = context_percentage(&data).unwrap_or_default();
     let root = git_root_dir(cwd);
     let branch = git_branch(cwd);
-    let changes = git_changes(cwd);
+    let changes = git_status(cwd);
 
     let parts: Vec<&str> = [
         ctx_pct.as_str(),
