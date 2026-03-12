@@ -128,15 +128,18 @@ fn color(code: &str, text: &str) -> String {
 
 fn git_root_dir(cwd: Option<&str>) -> String {
     if !is_inside_git_work_tree(cwd) {
-        return "no git".to_string();
+        return String::new();
     }
     match run_git("rev-parse --show-toplevel", cwd) {
         Some(root) => {
-            let trimmed = root.trim_end_matches(['/', '\\']);
-            let name = trimmed.rsplit_once(['/', '\\']).map_or(trimmed, |(_, n)| n);
-            if name.is_empty() { root } else { name.to_string() }
+            if let Ok(home) = env::var("HOME") {
+                if root.starts_with(&home) {
+                    return format!("~{}", &root[home.len()..]);
+                }
+            }
+            root
         }
-        None => "no git".to_string(),
+        None => String::new(),
     }
 }
 
@@ -262,21 +265,28 @@ fn main() {
     let root = git_root_dir(cwd);
     let branch = git_branch(cwd);
     let changes = git_status(cwd);
-
     let aws = aws_info();
 
-    let parts: Vec<&str> = [
-        ctx_pct.as_str(),
-        root.as_str(),
-        branch.as_str(),
-        changes.as_str(),
-        aws.as_str(),
-    ]
-    .into_iter()
-    .filter(|s| !s.is_empty())
-    .collect();
+    let mut line = String::new();
 
-    let line = parts.join(" | ");
+    if !ctx_pct.is_empty() {
+        line.push_str(&ctx_pct);
+        line.push_str(" | ");
+    }
+
+    if !root.is_empty() {
+        line.push_str(&root);
+    }
+    if !branch.is_empty() {
+        line.push_str(&format!(" ({})", branch));
+    }
+    if !changes.is_empty() {
+        line.push_str(&format!(" [{}]", changes));
+    }
+
+    if !aws.is_empty() {
+        line.push_str(&format!(" | {}", aws));
+    }
     let output = format!("\x1b[0m{}", line.replace(' ', "\u{00A0}"));
     println!("{}", output);
 }
