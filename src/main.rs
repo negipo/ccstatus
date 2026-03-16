@@ -157,6 +157,8 @@ fn git_status(cwd: Option<&str>) -> String {
     let mut staged = false;
     let mut untracked = false;
     let mut deleted = false;
+    let mut conflicted = false;
+    let mut renamed = false;
 
     for line in output.lines() {
         let bytes = line.as_bytes();
@@ -170,8 +172,16 @@ fn git_status(cwd: Option<&str>) -> String {
             untracked = true;
             continue;
         }
-        if matches!(index, b'A' | b'M' | b'R' | b'C') {
+        if index == b'U' || worktree == b'U' || (index == b'A' && worktree == b'A') || (index == b'D' && worktree == b'D') {
+            conflicted = true;
+            continue;
+        }
+        if matches!(index, b'A' | b'M' | b'C') {
             staged = true;
+        }
+        if index == b'R' {
+            staged = true;
+            renamed = true;
         }
         if index == b'D' || worktree == b'D' {
             deleted = true;
@@ -184,11 +194,16 @@ fn git_status(cwd: Option<&str>) -> String {
         }
     }
 
+    let stashed = run_git("stash list", cwd).is_some();
+
     let mut flags = String::new();
+    if conflicted { flags.push_str(&color("31", "=")); }
     if modified { flags.push_str(&color("33", "M")); }
     if staged { flags.push_str(&color("32", "S")); }
+    if renamed { flags.push_str(&color("33", "R")); }
     if untracked { flags.push_str(&color("31", "?")); }
     if deleted { flags.push_str(&color("33", "D")); }
+    if stashed { flags.push_str(&color("33", "$")); }
 
     let ahead_behind = git_ahead_behind(cwd);
     if !ahead_behind.is_empty() {
@@ -209,10 +224,11 @@ fn git_ahead_behind(cwd: Option<&str>) -> String {
     let ahead: i64 = parts[1].parse().unwrap_or(0);
 
     let mut result = String::new();
-    if ahead > 0 {
+    if ahead > 0 && behind > 0 {
+        result.push('⇕');
+    } else if ahead > 0 {
         result.push('⇡');
-    }
-    if behind > 0 {
+    } else if behind > 0 {
         result.push('⇣');
     }
     result
@@ -276,10 +292,10 @@ fn main() {
             line.push_str(&root);
         }
         if !branch.is_empty() {
-            line.push_str(&format!(" ({})", branch));
+            line.push_str(&format!(" {}", branch));
         }
         if !changes.is_empty() {
-            line.push_str(&format!(" [{}]", changes));
+            line.push_str(&format!(":{}", changes));
         }
     } else {
         let dir_display = match cwd {
