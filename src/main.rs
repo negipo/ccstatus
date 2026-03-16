@@ -126,36 +126,31 @@ fn color(code: &str, text: &str) -> String {
     format!("\x1b[{}m{}\x1b[0m", code, text)
 }
 
+fn tilde_path(path: &str) -> String {
+    if let Ok(home) = env::var("HOME") {
+        if path.starts_with(&home) {
+            return format!("~{}", &path[home.len()..]);
+        }
+    }
+    path.to_string()
+}
+
 fn git_root_dir(cwd: Option<&str>) -> String {
     if !is_inside_git_work_tree(cwd) {
         return String::new();
     }
     match run_git("rev-parse --show-toplevel", cwd) {
-        Some(root) => {
-            if let Ok(home) = env::var("HOME") {
-                if root.starts_with(&home) {
-                    return format!("~{}", &root[home.len()..]);
-                }
-            }
-            root
-        }
+        Some(root) => tilde_path(&root),
         None => String::new(),
     }
 }
 
 fn git_branch(cwd: Option<&str>) -> String {
-    if !is_inside_git_work_tree(cwd) {
-        return "no git".to_string();
-    }
-    let branch = run_git("branch --show-current", cwd).unwrap_or_else(|| "no git".to_string());
+    let branch = run_git("branch --show-current", cwd).unwrap_or_default();
     color("35", &branch)
 }
 
 fn git_status(cwd: Option<&str>) -> String {
-    if !is_inside_git_work_tree(cwd) {
-        return "(no git)".to_string();
-    }
-
     let output = run_git("status --porcelain", cwd).unwrap_or_default();
 
     let mut modified = false;
@@ -262,9 +257,7 @@ fn main() {
     let cwd = resolve_cwd(&data);
 
     let ctx_pct = context_percentage(&data).unwrap_or_default();
-    let root = git_root_dir(cwd);
-    let branch = git_branch(cwd);
-    let changes = git_status(cwd);
+    let in_git = is_inside_git_work_tree(cwd);
     let aws = aws_info();
 
     let mut line = String::new();
@@ -274,14 +267,28 @@ fn main() {
         line.push_str(" | ");
     }
 
-    if !root.is_empty() {
-        line.push_str(&root);
-    }
-    if !branch.is_empty() {
-        line.push_str(&format!(" ({})", branch));
-    }
-    if !changes.is_empty() {
-        line.push_str(&format!(" [{}]", changes));
+    if in_git {
+        let root = git_root_dir(cwd);
+        let branch = git_branch(cwd);
+        let changes = git_status(cwd);
+
+        if !root.is_empty() {
+            line.push_str(&root);
+        }
+        if !branch.is_empty() {
+            line.push_str(&format!(" ({})", branch));
+        }
+        if !changes.is_empty() {
+            line.push_str(&format!(" [{}]", changes));
+        }
+    } else {
+        let dir_display = match cwd {
+            Some(dir) => tilde_path(dir),
+            None => env::current_dir()
+                .map(|p| tilde_path(&p.to_string_lossy()))
+                .unwrap_or_default(),
+        };
+        line.push_str(&dir_display);
     }
 
     if !aws.is_empty() {
