@@ -3,12 +3,14 @@
 Claude Code 用のステータスラインフォーマッタ。stdin から StatusJSON を受け取り、固定レイアウトのステータスラインを出力する。
 
 ```
-49% | ~/src/github.com/negipo/ccstatus main:MS? | prod/ap-northeast-1
+ctx:49% 5h:30% 7d:68% | ~/src/github.com/negipo/ccstatus main:MS? | prod/ap-northeast-1
 ```
 
 レイアウト:
 
-- Context % -- 75% を超えると赤色で表示
+- ctx: Context Window 使用率 -- 75% を超えると赤色で表示
+- 5h: 5時間ウィンドウ使用率 -- 50% 超で黄色、75% 超で赤色
+- 7d: 7日間ウィンドウ使用率 -- 50% 超で黄色、75% 超で赤色
 - `|`
 - Git Root Dir (~ 付きフルパス) Branch:Status
 - `|`
