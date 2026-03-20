@@ -9,6 +9,18 @@ struct StatusJSON {
     cwd: Option<String>,
     workspace: Option<Workspace>,
     context_window: Option<ContextWindow>,
+    rate_limits: Option<RateLimits>,
+}
+
+#[derive(Deserialize)]
+struct RateLimits {
+    five_hour: Option<RateWindow>,
+    seven_day: Option<RateWindow>,
+}
+
+#[derive(Deserialize)]
+struct RateWindow {
+    used_percentage: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -89,6 +101,33 @@ fn format_context_percentage(pct: f64) -> String {
     } else {
         text
     }
+}
+
+fn format_rate_percentage(pct: f64) -> String {
+    let text = format!("{:.0}%", pct);
+    if pct > 75.0 {
+        format!("\x1b[31m{}\x1b[0m", text)
+    } else if pct > 50.0 {
+        format!("\x1b[33m{}\x1b[0m", text)
+    } else {
+        text
+    }
+}
+
+fn rate_limit_info(data: &StatusJSON) -> (Option<String>, Option<String>) {
+    let rl = match data.rate_limits.as_ref() {
+        Some(r) => r,
+        None => return (None, None),
+    };
+    let five = rl.five_hour.as_ref()
+        .and_then(|w| w.used_percentage)
+        .filter(|p| p.is_finite() && *p >= 0.0)
+        .map(|p| format_rate_percentage(p.min(100.0)));
+    let seven = rl.seven_day.as_ref()
+        .and_then(|w| w.used_percentage)
+        .filter(|p| p.is_finite() && *p >= 0.0)
+        .map(|p| format_rate_percentage(p.min(100.0)));
+    (five, seven)
 }
 
 fn context_percentage(data: &StatusJSON) -> Option<String> {
@@ -273,14 +312,27 @@ fn main() {
     let cwd = resolve_cwd(&data);
 
     let ctx_pct = context_percentage(&data).unwrap_or_default();
+    let (five_h, seven_d) = rate_limit_info(&data);
     let in_git = is_inside_git_work_tree(cwd);
     let aws = aws_info();
 
     let mut line = String::new();
 
-    if !ctx_pct.is_empty() {
-        line.push_str(&ctx_pct);
-        line.push_str(" | ");
+    {
+        let mut usage_parts: Vec<String> = Vec::new();
+        if !ctx_pct.is_empty() {
+            usage_parts.push(format!("ctx:{}", ctx_pct));
+        }
+        if let Some(ref f) = five_h {
+            usage_parts.push(format!("5h:{}", f));
+        }
+        if let Some(ref s) = seven_d {
+            usage_parts.push(format!("7d:{}", s));
+        }
+        if !usage_parts.is_empty() {
+            line.push_str(&usage_parts.join(" "));
+            line.push_str(" | ");
+        }
     }
 
     if in_git {
