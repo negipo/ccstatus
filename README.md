@@ -1,30 +1,30 @@
 # ccstatus
 
-Claude Code 用のステータスラインフォーマッタ。stdin から StatusJSON を受け取り、固定レイアウトのステータスラインを出力する。
+A status line formatter for Claude Code. Reads StatusJSON from stdin and outputs a fixed-layout status line.
 
 ```
 ctx:49% 5h:30% 7d:68% | ~/src/github.com/negipo/ccstatus main:MS? | prod/ap-northeast-1
 ```
 
-レイアウト:
+Layout:
 
-- ctx: Context Window 使用率 -- 75% を超えると赤色で表示
-- 5h: 5時間ウィンドウ使用率 -- 50% 超で黄色、75% 超で赤色
-- 7d: 7日間ウィンドウ使用率 -- 50% 超で黄色、75% 超で赤色
+- ctx: Context window usage -- displayed in red when exceeding 75%
+- 5h: 5-hour window usage -- yellow above 50%, red above 75%
+- 7d: 7-day window usage -- yellow above 50%, red above 75%
 - `|`
-- Git Root Dir (~ 付きフルパス) Branch:Status
+- Git root dir (full path with ~) Branch:Status
 - `|`
-- AWS Profile/Region -- AWS_PROFILE, AWS_REGION 環境変数から取得。未設定時は省略
+- AWS Profile/Region -- sourced from AWS_PROFILE and AWS_REGION environment variables; omitted when unset
 
-## インストール
+## Installation
 
-Rust ツールチェーンが必要。
+Requires the Rust toolchain.
 
 ```bash
 cargo install --git https://github.com/negipo/ccstatus
 ```
 
-ローカルからインストールする場合:
+To install from a local clone:
 
 ```bash
 git clone https://github.com/negipo/ccstatus.git
@@ -32,11 +32,11 @@ cd ccstatus
 cargo install --path .
 ```
 
-`~/.cargo/bin` が PATH に含まれていることを確認する。
+Make sure `~/.cargo/bin` is in your PATH.
 
-## Claude Code への設定
+## Claude Code Configuration
 
-`~/.claude/settings.json` に以下を追加する:
+Add the following to `~/.claude/settings.json`:
 
 ```json
 {
