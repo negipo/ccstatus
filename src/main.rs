@@ -2,6 +2,7 @@ use std::env;
 use std::io::Read;
 use std::process::Command;
 
+use chrono::{Local, TimeZone};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -21,6 +22,7 @@ struct RateLimits {
 #[derive(Deserialize)]
 struct RateWindow {
     used_percentage: Option<f64>,
+    resets_at: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -103,8 +105,21 @@ fn format_context_percentage(pct: f64) -> String {
     }
 }
 
-fn format_rate_percentage(pct: f64) -> String {
-    let text = format!("{:.0}%", pct);
+fn format_reset_time(epoch: f64) -> Option<String> {
+    Local.timestamp_opt(epoch as i64, 0).single()
+        .map(|dt| dt.format("%H:%M").to_string())
+}
+
+fn format_rate_percentage(pct: f64, resets_at: Option<f64>) -> String {
+    let pct_text = format!("{:.0}%", pct);
+    let reset_suffix = if pct > 50.0 {
+        resets_at.and_then(format_reset_time)
+            .map(|t| format!("(~{})", t))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    let text = format!("{}{}", pct_text, reset_suffix);
     if pct > 75.0 {
         format!("\x1b[31m{}\x1b[0m", text)
     } else if pct > 50.0 {
@@ -120,13 +135,13 @@ fn rate_limit_info(data: &StatusJSON) -> (Option<String>, Option<String>) {
         None => return (None, None),
     };
     let five = rl.five_hour.as_ref()
-        .and_then(|w| w.used_percentage)
-        .filter(|p| p.is_finite() && *p >= 0.0)
-        .map(|p| format_rate_percentage(p.min(100.0)));
+        .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
+        .filter(|(p, _)| p.is_finite() && *p >= 0.0)
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
     let seven = rl.seven_day.as_ref()
-        .and_then(|w| w.used_percentage)
-        .filter(|p| p.is_finite() && *p >= 0.0)
-        .map(|p| format_rate_percentage(p.min(100.0)));
+        .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
+        .filter(|(p, _)| p.is_finite() && *p >= 0.0)
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
     (five, seven)
 }
 
