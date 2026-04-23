@@ -124,7 +124,7 @@ fn format_rate_percentage(pct: f64, resets_at: Option<f64>, with_date: bool) -> 
     };
     let reset_suffix = if pct > 50.0 {
         resets_at.and_then(|e| format_reset_time(e, with_date))
-            .map(|t| format!("(~{})", t))
+            .map(|t| format!("\x1b[90m(~{})\x1b[0m", t))
             .unwrap_or_default()
     } else {
         String::new()
