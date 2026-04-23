@@ -105,31 +105,36 @@ fn format_context_percentage(pct: f64) -> String {
     }
 }
 
-fn format_reset_time(epoch: f64) -> Option<String> {
+fn format_reset_time(epoch: f64, with_date: bool) -> Option<String> {
     Local.timestamp_opt(epoch as i64, 0).single()
-        .map(|dt| dt.format("%H:%M").to_string())
+        .map(|dt| {
+            let fmt = if with_date { "%m/%d %H:%M" } else { "%H:%M" };
+            dt.format(fmt).to_string()
+        })
 }
 
-fn format_rate_percentage(pct: f64, resets_at: Option<f64>) -> String {
+fn format_rate_percentage(pct: f64, resets_at: Option<f64>, with_date: bool) -> (String, String) {
     let pct_text = format!("{:.0}%", pct);
+    let colored_pct = if pct > 75.0 {
+        format!("\x1b[31m{}\x1b[0m", pct_text)
+    } else if pct > 50.0 {
+        format!("\x1b[33m{}\x1b[0m", pct_text)
+    } else {
+        pct_text
+    };
     let reset_suffix = if pct > 50.0 {
-        resets_at.and_then(format_reset_time)
+        resets_at.and_then(|e| format_reset_time(e, with_date))
             .map(|t| format!("(~{})", t))
             .unwrap_or_default()
     } else {
         String::new()
     };
-    let text = format!("{}{}", pct_text, reset_suffix);
-    if pct > 75.0 {
-        format!("\x1b[31m{}\x1b[0m", text)
-    } else if pct > 50.0 {
-        format!("\x1b[33m{}\x1b[0m", text)
-    } else {
-        text
-    }
+    (colored_pct, reset_suffix)
 }
 
-fn rate_limit_info(data: &StatusJSON) -> (Option<String>, Option<String>) {
+type RateDisplay = (String, String);
+
+fn rate_limit_info(data: &StatusJSON) -> (Option<RateDisplay>, Option<RateDisplay>) {
     let rl = match data.rate_limits.as_ref() {
         Some(r) => r,
         None => return (None, None),
@@ -137,11 +142,11 @@ fn rate_limit_info(data: &StatusJSON) -> (Option<String>, Option<String>) {
     let five = rl.five_hour.as_ref()
         .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
         .filter(|(p, _)| p.is_finite() && *p >= 0.0)
-        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r, false));
     let seven = rl.seven_day.as_ref()
         .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
         .filter(|(p, _)| p.is_finite() && *p >= 0.0)
-        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r, true));
     (five, seven)
 }
 
@@ -338,11 +343,11 @@ fn main() {
         if !ctx_pct.is_empty() {
             usage_parts.push(format!("ctx:{}", ctx_pct));
         }
-        if let Some(ref f) = five_h {
-            usage_parts.push(format!("5h:{}", f));
+        if let Some((pct, reset)) = five_h.as_ref() {
+            usage_parts.push(format!("5h{}:{}", reset, pct));
         }
-        if let Some(ref s) = seven_d {
-            usage_parts.push(format!("7d:{}", s));
+        if let Some((pct, reset)) = seven_d.as_ref() {
+            usage_parts.push(format!("7d{}:{}", reset, pct));
         }
         if !usage_parts.is_empty() {
             line.push_str(&usage_parts.join(" "));
