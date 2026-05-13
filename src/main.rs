@@ -2,7 +2,7 @@ use std::env;
 use std::io::Read;
 use std::process::Command;
 
-use chrono::{Local, TimeZone};
+use chrono::Local;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -105,15 +105,28 @@ fn format_context_percentage(pct: f64) -> String {
     }
 }
 
-fn format_reset_time(epoch: f64, with_date: bool) -> Option<String> {
-    Local.timestamp_opt(epoch as i64, 0).single()
-        .map(|dt| {
-            let fmt = if with_date { "%m/%d %H:%M" } else { "%H:%M" };
-            dt.format(fmt).to_string()
-        })
+fn format_remaining_time(epoch: f64) -> Option<String> {
+    if !epoch.is_finite() {
+        return None;
+    }
+    let now = Local::now().timestamp();
+    let diff = (epoch as i64).saturating_sub(now).max(0);
+    let days = diff / 86_400;
+    let hours = (diff % 86_400) / 3_600;
+    let minutes = (diff % 3_600) / 60;
+
+    let mut s = String::new();
+    if days > 0 {
+        s.push_str(&format!("{}d", days));
+    }
+    if days > 0 || hours > 0 {
+        s.push_str(&format!("{}h", hours));
+    }
+    s.push_str(&format!("{}m", minutes));
+    Some(s)
 }
 
-fn format_rate_percentage(pct: f64, resets_at: Option<f64>, with_date: bool) -> (String, String) {
+fn format_rate_percentage(pct: f64, resets_at: Option<f64>) -> (String, String) {
     let pct_text = format!("{:.0}%", pct);
     let colored_pct = if pct > 75.0 {
         format!("\x1b[31m{}\x1b[0m", pct_text)
@@ -123,7 +136,7 @@ fn format_rate_percentage(pct: f64, resets_at: Option<f64>, with_date: bool) -> 
         pct_text
     };
     let reset_suffix = if pct > 50.0 {
-        resets_at.and_then(|e| format_reset_time(e, with_date))
+        resets_at.and_then(format_remaining_time)
             .map(|t| format!("\x1b[90m(~{})\x1b[0m", t))
             .unwrap_or_default()
     } else {
@@ -142,11 +155,11 @@ fn rate_limit_info(data: &StatusJSON) -> (Option<RateDisplay>, Option<RateDispla
     let five = rl.five_hour.as_ref()
         .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
         .filter(|(p, _)| p.is_finite() && *p >= 0.0)
-        .map(|(p, r)| format_rate_percentage(p.min(100.0), r, false));
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
     let seven = rl.seven_day.as_ref()
         .and_then(|w| w.used_percentage.map(|p| (p, w.resets_at)))
         .filter(|(p, _)| p.is_finite() && *p >= 0.0)
-        .map(|(p, r)| format_rate_percentage(p.min(100.0), r, true));
+        .map(|(p, r)| format_rate_percentage(p.min(100.0), r));
     (five, seven)
 }
 
