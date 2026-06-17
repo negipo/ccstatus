@@ -356,7 +356,7 @@ fn main() {
         let trimmed = sid.trim();
         if !trimmed.is_empty() {
             line.push_str(trimmed);
-            line.push(' ');
+            line.push_str(" | ");
         }
     }
 
