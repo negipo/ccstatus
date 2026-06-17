@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct StatusJSON {
+    session_id: Option<String>,
     cwd: Option<String>,
     workspace: Option<Workspace>,
     context_window: Option<ContextWindow>,
@@ -350,6 +351,14 @@ fn main() {
     let aws = aws_info();
 
     let mut line = String::new();
+
+    if let Some(ref sid) = data.session_id {
+        let trimmed = sid.trim();
+        if !trimmed.is_empty() {
+            line.push_str(trimmed);
+            line.push(' ');
+        }
+    }
 
     {
         let mut usage_parts: Vec<String> = Vec::new();
