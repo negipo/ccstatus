@@ -358,28 +358,22 @@ fn main() {
 
     let mut line = String::new();
 
-    {
-        let mut head_parts: Vec<String> = Vec::new();
-        if let Some(ref sid) = data.session_id {
-            let trimmed = sid.trim();
-            if !trimmed.is_empty() {
-                head_parts.push(trimmed.to_string());
-            }
-        }
-        if let Some(name) = data.model.as_ref().and_then(|m| m.display_name.as_deref()) {
-            let trimmed = name.trim();
-            if !trimmed.is_empty() {
-                head_parts.push(trimmed.to_string());
-            }
-        }
-        if !head_parts.is_empty() {
-            line.push_str(&head_parts.join(" "));
+    if let Some(ref sid) = data.session_id {
+        let trimmed = sid.trim();
+        if !trimmed.is_empty() {
+            line.push_str(trimmed);
             line.push_str(" | ");
         }
     }
 
     {
         let mut usage_parts: Vec<String> = Vec::new();
+        if let Some(name) = data.model.as_ref().and_then(|m| m.display_name.as_deref()) {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                usage_parts.push(trimmed.to_string());
+            }
+        }
         if !ctx_pct.is_empty() {
             usage_parts.push(format!("ctx:{}", ctx_pct));
         }
