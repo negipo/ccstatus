@@ -8,10 +8,16 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 struct StatusJSON {
     session_id: Option<String>,
+    model: Option<Model>,
     cwd: Option<String>,
     workspace: Option<Workspace>,
     context_window: Option<ContextWindow>,
     rate_limits: Option<RateLimits>,
+}
+
+#[derive(Deserialize)]
+struct Model {
+    display_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -352,10 +358,22 @@ fn main() {
 
     let mut line = String::new();
 
-    if let Some(ref sid) = data.session_id {
-        let trimmed = sid.trim();
-        if !trimmed.is_empty() {
-            line.push_str(trimmed);
+    {
+        let mut head_parts: Vec<String> = Vec::new();
+        if let Some(ref sid) = data.session_id {
+            let trimmed = sid.trim();
+            if !trimmed.is_empty() {
+                head_parts.push(trimmed.to_string());
+            }
+        }
+        if let Some(name) = data.model.as_ref().and_then(|m| m.display_name.as_deref()) {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                head_parts.push(trimmed.to_string());
+            }
+        }
+        if !head_parts.is_empty() {
+            line.push_str(&head_parts.join(" "));
             line.push_str(" | ");
         }
     }
