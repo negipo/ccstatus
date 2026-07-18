@@ -369,9 +369,9 @@ fn main() {
     {
         let mut usage_parts: Vec<String> = Vec::new();
         if let Some(name) = data.model.as_ref().and_then(|m| m.display_name.as_deref()) {
-            let trimmed = name.trim();
-            if !trimmed.is_empty() {
-                usage_parts.push(trimmed.to_string());
+            let compact: String = name.chars().filter(|c| !c.is_whitespace()).collect();
+            if !compact.is_empty() {
+                usage_parts.push(compact);
             }
         }
         if !ctx_pct.is_empty() {
