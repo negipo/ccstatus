@@ -3,15 +3,16 @@
 A status line formatter for Claude Code. Reads StatusJSON from stdin and outputs a fixed-layout status line.
 
 ```
-3f9a8c2e-... | ctx:49% 5h(~1h23m):58% 7d(~2d5h30m):68% | ~/src/github.com/negipo/ccstatus main:MS? | prod/ap-northeast-1
-|              |       |              |                  |                                |    |     |
-|              |       |              |                  |                                |    |     AWS Profile/Region
-|              |       |              |                  |                                |    status
-|              |       |              |                  |                                branch
-|              |       |              |                  git root dir (~ abbreviated)
-|              |       |              7-day rate limit usage with remaining time until reset
-|              |       5-hour rate limit usage with remaining time until reset
-|              context window usage
+3f9a8c2e-... | Fable5.1(high) ctx:49% 5h(~1h23m):58% 7d(~2d5h30m):68% | ~/src/github.com/negipo/ccstatus main:MS? | prod/ap-northeast-1
+|              |              |       |              |                  |                                |    |     |
+|              |              |       |              |                  |                                |    |     AWS Profile/Region
+|              |              |       |              |                  |                                |    status
+|              |              |       |              |                  |                                branch
+|              |              |       |              |                  git root dir (~ abbreviated)
+|              |              |       |              7-day rate limit usage with remaining time until reset
+|              |              |       5-hour rate limit usage with remaining time until reset
+|              |              context window usage
+|              model name with reasoning effort level (effort is omitted when the model does not support it)
 session id
 ```
 

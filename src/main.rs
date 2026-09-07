@@ -13,6 +13,12 @@ struct StatusJSON {
     workspace: Option<Workspace>,
     context_window: Option<ContextWindow>,
     rate_limits: Option<RateLimits>,
+    effort: Option<Effort>,
+}
+
+#[derive(Deserialize)]
+struct Effort {
+    level: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -369,8 +375,14 @@ fn main() {
     {
         let mut usage_parts: Vec<String> = Vec::new();
         if let Some(name) = data.model.as_ref().and_then(|m| m.display_name.as_deref()) {
-            let compact: String = name.chars().filter(|c| !c.is_whitespace()).collect();
+            let mut compact: String = name.chars().filter(|c| !c.is_whitespace()).collect();
             if !compact.is_empty() {
+                if let Some(level) = data.effort.as_ref().and_then(|e| e.level.as_deref()) {
+                    let level = level.trim();
+                    if !level.is_empty() {
+                        compact.push_str(&format!("({})", level));
+                    }
+                }
                 usage_parts.push(compact);
             }
         }
