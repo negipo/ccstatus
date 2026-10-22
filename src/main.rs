@@ -98,6 +98,7 @@ fn run_git(args: &str, cwd: Option<&str>) -> Option<String> {
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
     }
+    cmd.env("GIT_OPTIONAL_LOCKS", "0");
     cmd.stderr(std::process::Stdio::null());
     let output = cmd.output().ok()?;
     if !output.status.success() {
